@@ -53,6 +53,13 @@ def find_node(team_data: dict, node_id: str) -> dict | None:
 # ---------- header ----------
 st.title("🗂️ NEXUS Vault")
 st.caption("Cerebro institucional tipo Obsidian — Knowledge Nexus LATAM")
+st.markdown(
+    "Escribe una necesidad institucional (o elige una real) y el sistema arma el "
+    "**equipo mínimo real** — antecedente + investigador + capacidad + asignatura — "
+    "que la cubre. Si ese equipo **no existe todavía como proyecto**, se marca como "
+    "**propuesta generada** (nodo con borde punteado). Todo nodo institucional trae "
+    "su evidencia exacta (archivo/id/campo) — haz clic para verla."
+)
 
 # ---------- sidebar ----------
 with st.sidebar:
