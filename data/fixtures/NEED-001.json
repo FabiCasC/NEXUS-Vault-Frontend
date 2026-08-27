@@ -1,0 +1,57 @@
+{
+  "nodes": [
+    {
+      "id": "NEED-001",
+      "type": "NEED",
+      "label": "Predicción y prevención de deserción estudiantil",
+      "generado": false,
+      "evidencia": {"archivo": "institutional_needs.csv", "id": "NEED-001", "campo": "title"},
+      "frase": "La universidad necesita anticipar el riesgo de abandono estudiantil en los dos primeros años."
+    },
+    {
+      "id": "THESIS-118",
+      "type": "THESIS",
+      "label": "Modelos predictivos de permanencia estudiantil",
+      "generado": false,
+      "evidencia": {"archivo": "theses.csv", "id": "THESIS-118", "campo": "title"},
+      "frase": "Tesis que modela trayectorias educativas con analítica de datos."
+    },
+    {
+      "id": "RES-014",
+      "type": "RESEARCHER",
+      "label": "Dra. Fiorella Ramos",
+      "generado": false,
+      "evidencia": {"archivo": "researchers.csv", "id": "RES-014", "campo": "name"},
+      "frase": "Investigadora en analítica educativa y ciencia de datos."
+    },
+    {
+      "id": "CAP-032",
+      "type": "CAPABILITY",
+      "label": "Analítica predictiva educativa",
+      "generado": false,
+      "evidencia": {"archivo": "institutional_capabilities.csv", "id": "CAP-032", "campo": "name"}
+    },
+    {
+      "id": "SUBJ-057",
+      "type": "SUBJECT",
+      "label": "Minería de datos educativos",
+      "generado": false,
+      "evidencia": {"archivo": "subjects.csv", "id": "SUBJ-057", "campo": "name"}
+    },
+    {
+      "id": "PROP-001",
+      "type": "PROP",
+      "label": "Propuesta: Sistema de alerta temprana de deserción",
+      "generado": true,
+      "evidencia": null,
+      "frase": "Equipo mínimo que cubre la necesidad y todavía no existe como proyecto en Data V1.0."
+    }
+  ],
+  "edges": [
+    {"source": "NEED-001", "target": "PROP-001", "weight": 0.83},
+    {"source": "PROP-001", "target": "THESIS-118", "weight": 0.71},
+    {"source": "PROP-001", "target": "RES-014", "weight": 0.65},
+    {"source": "PROP-001", "target": "CAP-032", "weight": 0.58},
+    {"source": "PROP-001", "target": "SUBJ-057", "weight": 0.40}
+  ]
+}

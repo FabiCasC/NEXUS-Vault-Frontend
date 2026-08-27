@@ -1,147 +1,136 @@
 """
-app.py
-Shell principal de NEXUS Vault (frontend puro).
+NEXUS Vault — Frontend (Streamlit)
+Knowledge Nexus LATAM · Hackathon Perú 2026
 
-Este repo NO calcula el equipo mínimo ni corre el algoritmo de set cover.
-Eso vive en el backend (repo NEXUS-Vault-API, backend/team_formation.py +
-backend/api.py). Este archivo:
-  1. Le pega por HTTP a NEXUS_API_URL/form-team (backend real, otro proceso).
-  2. Si la API no responde o falla, usa una fixture local en /fixtures para
-     que la interfaz nunca se caiga (LU-5).
-  3. Dibuja el grafo (graph_view.py) y el panel de nota (note_panel.py).
+Shell principal: layout de dos columnas (grafo | nota).
+
+Flujo principal: el usuario escribe una idea/problema en texto libre
+y eso CREA un NEED (vía API). El combo de necesidades existentes es
+secundario, para explorar lo que ya está en Data V1.0.
+
+Tareas cubiertas:
+LU-1 shell + layout
+LU-2 combo de NEEDs (secundario)
+LU-3 graph_view (delegado)
+LU-4 click en nodo -> note_panel.render_note
+LU-5 team_api: llamada a API real con fallback a fixture
+LU-6 caja de idea libre -> crea un NEED nuevo, sin crashear
 """
 
-import json
-import os
-from pathlib import Path
+from __future__ import annotations
 
-import pandas as pd
-import requests
 import streamlit as st
 
-from graph_view import render_graph
-from note_panel import render_note
+from services.team_api import explore
+from services.needs_loader import load_needs
+from components.graph_view import render_graph
+from components.note_panel import render_note, render_empty_state
 
-# El backend vive en OTRO repo/proceso — se habla por HTTP, no por import.
-# Configurable por si alguien lo corre en otro puerto/máquina el día de la demo.
-API_URL = os.environ.get("NEXUS_API_URL", "http://localhost:8000").rstrip("/")
+st.set_page_config(
+    page_title="NEXUS Vault",
+    page_icon="🗂️",
+    layout="wide",
+)
 
-BASE_DIR = Path(__file__).parent
-DATA_DIR = BASE_DIR / "data"
-FIXTURES_DIR = BASE_DIR / "fixtures"
-
-st.set_page_config(page_title="NEXUS Vault", page_icon="🔗", layout="wide")
-
-
-@st.cache_data
-def load_needs() -> pd.DataFrame:
-    return pd.read_csv(DATA_DIR / "institutional_needs.csv")
-
-
-@st.cache_data(ttl=5)
-def api_is_alive() -> bool:
-    """Chequeo rápido para el badge de estado (se re-evalúa cada 5s, por si
-    Fabiana/Kevin levantan la API mientras la demo ya está abierta)."""
-    try:
-        r = requests.get(f"{API_URL}/health", timeout=2)
-        return r.ok
-    except requests.RequestException:
-        return False
+# ---------- estado de sesión ----------
+if "selected_node" not in st.session_state:
+    st.session_state.selected_node = None
+if "current_team_data" not in st.session_state:
+    st.session_state.current_team_data = None
+if "current_need" not in st.session_state:
+    st.session_state.current_need = None
+if "last_query_label" not in st.session_state:
+    st.session_state.last_query_label = None
 
 
-def load_fixture(need_id: str | None) -> dict:
-    """Fixture local de respaldo. Si no hay una fixture con ese id, usa default.json."""
-    fixture_path = FIXTURES_DIR / f"{need_id}.json" if need_id else None
-    if fixture_path is None or not fixture_path.exists():
-        fixture_path = FIXTURES_DIR / "default.json"
-    with open(fixture_path, encoding="utf-8") as f:
-        return json.load(f)
+def find_node(team_data: dict, node_id: str) -> dict | None:
+    for n in team_data.get("nodes", []):
+        if n.get("id") == node_id:
+            return n
+    return None
 
 
-def fetch_from_api(need_id: str | None, free_text: str | None, timeout: float = 8.0) -> dict:
-    params = {}
-    if need_id:
-        params["need_id"] = need_id
-    if free_text:
-        params["free_text"] = free_text
-    resp = requests.get(f"{API_URL}/form-team", params=params, timeout=timeout)
-    resp.raise_for_status()
-    data = resp.json()
-    if "error" in data:
-        raise ValueError(data["error"])
-    return data
+# ---------- header ----------
+st.title("🗂️ NEXUS Vault")
+st.caption("Cerebro institucional tipo Obsidian — Knowledge Nexus LATAM")
 
+# ---------- sidebar ----------
+with st.sidebar:
+    st.subheader("💡 Nueva necesidad")
+    st.caption("Escribe un problema o idea — se crea un NEED nuevo.")
 
-def get_graph_data(need_id: str | None = None, free_text: str | None = None) -> dict:
-    """
-    Punto único para conseguir el grafo a mostrar.
-    Intenta la API real / si falla, cae a fixture. Nunca revienta la UI.
-    """
-    try:
-        return fetch_from_api(need_id=need_id, free_text=free_text)
-    except Exception as exc:  # la API puede fallar por mil razones distintas
-        st.warning(f"No pude conectar con la API ({exc}). Mostrando datos de ejemplo.")
-        return load_fixture(need_id)
+    free_text = st.text_area(
+        "¿Qué problema quieres explorar?",
+        placeholder="Ej: predicción de deserción en cursos de ciencias básicas...",
+        height=110,
+        label_visibility="collapsed",
+    )
+    create_submit = st.button("✨ Crear necesidad y explorar", use_container_width=True, type="primary")
 
+    st.divider()
 
-def main() -> None:
-    st.title("🔗 NEXUS Vault")
-    st.caption("Cerebro institucional tipo Obsidian — cobertura de equipo + huecos + evidencia")
+    with st.expander("O elige una necesidad que ya existe"):
+        needs_df = load_needs()
+        options = ["— Selecciona —"] + [f"{row['id']} · {row['title']}" for _, row in needs_df.iterrows()]
+        choice = st.selectbox("Necesidad institucional (NEED)", options, index=0, label_visibility="collapsed")
+        existing_submit = st.button("Explorar esta necesidad", use_container_width=True)
 
-    needs_df = load_needs()
-    backend_ok = api_is_alive()
+# ---------- disparo de la consulta ----------
+need_id = None
+query_free_text = None
 
-    col_side, col_graph, col_note = st.columns([1, 2, 1.3])
+if create_submit and free_text.strip():
+    query_free_text = free_text.strip()
 
-    with col_side:
-        badge = "🟢 API conectada" if backend_ok else "🔴 API no responde (usando ejemplos)"
-        st.caption(f"{badge} · `{API_URL}`")
+if existing_submit and choice != "— Selecciona —":
+    need_id = choice.split(" · ")[0]
 
-        st.subheader("Idea libre")
-        free_text = st.text_area(
-            "Describe una necesidad con tus palabras",
-            placeholder="Ej: necesitamos reducir la deserción en primer año...",
-            key="free_text_input",
+if need_id or query_free_text:
+    with st.spinner("Armando equipo..."):
+        result, source, mapped = explore(need_id=need_id, free_text=query_free_text)
+
+    st.session_state.current_team_data = result.get("team_data")
+    st.session_state.current_need = result.get("need")
+    st.session_state.selected_node = None  # limpia selección anterior
+
+    need_label = None
+    if result.get("need"):
+        need_label = f"{result['need'].get('id', '')} · {result['need'].get('title', '')}"
+    st.session_state.last_query_label = need_label
+
+    if source == "fixture":
+        st.sidebar.info("API aún no disponible — mostrando datos de ejemplo (fixture).", icon="⚠️")
+    if query_free_text and not mapped:
+        st.sidebar.warning(
+            "El NEED se creó localmente porque la API no respondió todavía. "
+            "En cuanto esté arriba, esta idea se mandará de verdad.",
+            icon="💡",
         )
-        run_free = st.button("Explorar idea", type="primary")
+    elif query_free_text and mapped:
+        st.sidebar.success(f"Necesidad creada: {need_label}", icon="✅")
 
-        st.markdown("---")
-        st.subheader("O elige una NEED real")
-        options = ["-- elegir --"] + [
-            f"{row.id} · {row.title}" for row in needs_df.itertuples()
-        ]
-        choice = st.selectbox("NEED institucional (42 reales)", options, key="need_choice")
+# ---------- layout principal: grafo | nota ----------
+col_graph, col_note = st.columns([2, 1], gap="large")
 
-    need_id = None
-    graph_data = None
+with col_graph:
+    st.subheader("Grafo")
+    if st.session_state.last_query_label:
+        st.caption(st.session_state.last_query_label)
 
-    if run_free and free_text and free_text.strip():
-        graph_data = get_graph_data(free_text=free_text)
-    elif choice != "-- elegir --":
-        need_id = choice.split(" · ")[0]
-        graph_data = get_graph_data(need_id=need_id)
+    if st.session_state.current_team_data and st.session_state.current_team_data.get("nodes"):
+        clicked_id = render_graph(st.session_state.current_team_data)
+        if clicked_id:
+            st.session_state.selected_node = clicked_id
+    else:
+        st.info("Escribe una idea y crea una necesidad, o elige una existente, para ver el grafo.")
 
-    if graph_data is None:
-        with col_graph:
-            st.info("Escribe una idea libre o elige una NEED del combo para ver el grafo.")
-        with col_note:
-            st.caption("Aquí aparecerá la nota del nodo que elijas.")
-        return
-
-    with col_graph:
-        st.subheader("Grafo")
-        clicked = render_graph(graph_data)
-        if clicked:
-            st.session_state["selected_node"] = clicked
-
-    with col_note:
-        st.subheader("Nota")
-        selected = st.session_state.get("selected_node")
-        if selected:
-            render_note(selected, graph_data)
+with col_note:
+    st.subheader("Nota")
+    if st.session_state.selected_node and st.session_state.current_team_data:
+        node = find_node(st.session_state.current_team_data, st.session_state.selected_node)
+        if node:
+            render_note(node)
         else:
-            st.caption("Haz clic en un nodo del grafo para ver su nota.")
-
-
-if __name__ == "__main__":
-    main()
+            render_empty_state()
+    else:
+        render_empty_state()
