@@ -39,7 +39,10 @@ def _api_url() -> str:
         return os.environ.get("NEXUS_API_URL", "http://localhost:8000").rstrip("/")
 
 
-def explore(need_id: str | None = None, free_text: str | None = None, timeout: float = 8.0):
+def explore(need_id: str | None = None, free_text: str | None = None, timeout: float = 20.0):
+    # 20s: el backend puede intentar Gemini (hasta 8s) y, si falla, caer
+    # a ChatGPT (hasta 8s más) antes de responder. 8s se quedaba corto y
+    # hacía caer al fixture aunque la API sí estaba funcionando.
     """
     Devuelve (result: dict, source: "api"|"fixture", mapped: bool)
     result = {"need": {...} | None, "team_data": {"nodes": [...], "edges": [...]}}
