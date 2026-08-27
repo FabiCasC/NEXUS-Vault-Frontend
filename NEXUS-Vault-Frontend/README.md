@@ -63,11 +63,3 @@ Mientras `form_team.py` no exista (o si lanza una excepción), `app.py`
 cae automáticamente a `fixtures/<need_id>.json`, o a `fixtures/default.json`
 si no hay fixture para ese id. Así la UI vive sin depender del backend.
 
-## Estado de tareas (LU-1 a LU-6)
-
-- **LU-1** `app.py` — título NEXUS Vault, columnas grafo/nota, corre con `streamlit run`.
-- **LU-2** Combo NEED — lee `institutional_needs.csv` (id + title), 42 opciones.
-- **LU-3** `graph_view.py` — pinta nodos/aristas del JSON (fixture o form_team), color por tipo, PROP punteado. `NEED-001` se ve con `fixtures/NEED-001.json`.
-- **LU-4** Clic en nodo — llama a `note_panel.render_note`, muestra la frase y la fuente en pantalla.
-- **LU-5** `try/except` — `try form_team except fixture`. Sin el archivo de Kevin, la UI vive igual.
-- **LU-6** Caja de idea libre — input de texto; si no hay mapeo real, muestra sugerencia de usar el combo y nunca truena.
