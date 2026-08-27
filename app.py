@@ -564,7 +564,12 @@ def calculate_metrics(team_data: dict) -> dict:
 
     total_nodes = len(nodes)
     weights = [e.get("weight") for e in edges if isinstance(e.get("weight"), (int, float))]
-    avg_relevance = (sum(weights) / len(weights)) if weights else 0.0
+    avg_relevance_raw = (sum(weights) / len(weights)) if weights else 0.0
+    # "weight" es una suma de coincidencias de habilidades, no una probabilidad:
+    # una entidad que coincide con varias skills a la vez puede pasar de 1.0.
+    # Para mostrarlo como % (0-100) hay que acotarlo; el valor crudo se sigue
+    # usando tal cual para decidir el equipo, esto es solo para la tarjeta KPI.
+    avg_relevance = min(1.0, avg_relevance_raw)
 
     researchers = sum(1 for n in nodes if n.get("type") == "RESEARCHER")
     capabilities = sum(1 for n in nodes if n.get("type") == "CAPABILITY")
